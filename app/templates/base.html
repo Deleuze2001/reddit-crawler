@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script defer src="{{ url_for('static', path='/app.js') }}"></script>
+  </head>
+  <body{% if autorefresh %} data-autorefresh="true"{% endif %}>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">RC</span>
+        <span>{{ title }}</span>
+      </a>
+      <nav class="topnav">
+        <a href="/">Dashboard</a>
+      </nav>
+    </header>
+    <main class="shell">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

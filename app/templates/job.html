@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="detail-head">
+  <a class="back-link" href="/">
+    <i data-lucide="arrow-left" aria-hidden="true"></i>
+    <span>Dashboard</span>
+  </a>
+  <div class="title-row">
+    <div>
+      <span class="eyebrow">{{ job.target_type }}</span>
+      <h1>{{ job.target }}</h1>
+    </div>
+    <span class="status status-{{ job.status }}">{{ job.status }}</span>
+  </div>
+</section>
+
+{% if job.error %}
+<div class="alert" role="alert">
+  <i data-lucide="circle-alert" aria-hidden="true"></i>
+  <span>{{ job.error }}</span>
+</div>
+{% endif %}
+
+<section class="summary-grid">
+  <div class="metric">
+    <span class="metric-label">Requests</span>
+    <strong>{{ job.stats.get("requests", 0) }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Posts</span>
+    <strong>{{ job.stats.get("posts", 0) }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Comments</span>
+    <strong>{{ job.stats.get("comments", 0) }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Started</span>
+    <strong class="metric-small">{{ format_dt(job.started_at) or "Pending" }}</strong>
+  </div>
+</section>
+
+<section class="content-grid single">
+  <div class="panel">
+    <div class="panel-heading">
+      <h2>Collected Posts</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Post</th>
+            <th>Subreddit</th>
+            <th>Score</th>
+            <th>Comments</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for post in posts %}
+          <tr>
+            <td><a href="/posts/{{ post.id }}">{{ post.title or "Untitled" }}</a></td>
+            <td>{{ post.subreddit or "" }}</td>
+            <td>{{ post.score or 0 }}</td>
+            <td>{{ post.comment_count }}</td>
+            <td>{{ format_dt(post.created_at) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">No posts collected for this job yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel metadata-panel">
+    <div class="panel-heading">
+      <h2>Crawlbase</h2>
+    </div>
+    <dl class="metadata">
+      <dt>pc_status</dt>
+      <dd>{{ job.last_response.get("pc_status", "") }}</dd>
+      <dt>original_status</dt>
+      <dd>{{ job.last_response.get("original_status", "") }}</dd>
+      <dt>final_url</dt>
+      <dd>{{ job.last_response.get("final_url", "") }}</dd>
+      <dt>used_js</dt>
+      <dd>{{ job.last_response.get("used_js", false) }}</dd>
+      <dt>rid</dt>
+      <dd>{{ job.last_response.get("rid", "") }}</dd>
+    </dl>
+  </div>
+</section>
+{% endblock %}

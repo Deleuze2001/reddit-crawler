@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="summary-grid">
+  <div class="metric">
+    <span class="metric-label">Jobs</span>
+    <strong>{{ stats.jobs }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Queued</span>
+    <strong>{{ stats.queued }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Posts</span>
+    <strong>{{ stats.posts }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Comments</span>
+    <strong>{{ stats.comments }}</strong>
+  </div>
+  <div class="metric">
+    <span class="metric-label">Subreddits</span>
+    <strong>{{ stats.subreddits }}</strong>
+  </div>
+</section>
+
+{% if error %}
+<div class="alert" role="alert">
+  <i data-lucide="circle-alert" aria-hidden="true"></i>
+  <span>{{ error }}</span>
+</div>
+{% endif %}
+
+<section class="workbench">
+  <form class="panel job-form" action="/jobs" method="post">
+    <div class="panel-heading">
+      <h1>New Crawl</h1>
+      <button class="primary-button" type="submit">
+        <i data-lucide="play" aria-hidden="true"></i>
+        <span>Start</span>
+      </button>
+    </div>
+
+    <div class="form-grid">
+      <label>
+        <span>Target</span>
+        <select name="target_type">
+          {% set current_type = form.target_type or "subreddit" %}
+          {% for type in ["subreddit", "post", "user", "search"] %}
+          <option value="{{ type }}" {% if current_type == type %}selected{% endif %}>{{ type|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="wide">
+        <span>Value</span>
+        <input name="target" required value="{{ form.target or '' }}" placeholder="python, a post URL, a username, or a search query">
+      </label>
+
+      <label>
+        <span>Sort</span>
+        {% set current_sort = form.sort or "hot" %}
+        <select name="sort">
+          {% for option in ["hot", "new", "top", "rising", "controversial", "relevance", "comments"] %}
+          <option value="{{ option }}" {% if current_sort == option %}selected{% endif %}>{{ option|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        <span>Posts</span>
+        <input type="number" name="post_limit" min="1" max="{{ settings.reddit_max_limit }}" value="{{ form.post_limit or settings.reddit_default_limit }}">
+      </label>
+
+      <label>
+        <span>Comments</span>
+        <input type="number" name="comment_limit" min="1" max="500" value="{{ form.comment_limit or 100 }}">
+      </label>
+
+      <label data-search-subreddit>
+        <span>Search In</span>
+        <input name="subreddit_filter" value="{{ form.subreddit_filter or '' }}" placeholder="optional subreddit">
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <label class="check">
+        <input type="checkbox" name="include_comments" {% if form.include_comments == "on" %}checked{% endif %}>
+        <span>Collect comments</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="use_js" {% if form.use_js == "on" %}checked{% endif %}>
+        <span>Use JS token</span>
+      </label>
+    </div>
+  </form>
+</section>
+
+<section class="content-grid">
+  <div class="panel">
+    <div class="panel-heading">
+      <h2>Recent Jobs</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Type</th>
+            <th>Target</th>
+            <th>Items</th>
+            <th>Requested</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr>
+            <td><span class="status status-{{ job.status }}">{{ job.status }}</span></td>
+            <td>{{ job.target_type }}</td>
+            <td><a href="/jobs/{{ job.id }}">{{ job.target }}</a></td>
+            <td>{{ job.stats.get("posts", 0) }} / {{ job.stats.get("comments", 0) }}</td>
+            <td>{{ format_dt(job.requested_at) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">No jobs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-heading">
+      <h2>Recent Posts</h2>
+    </div>
+    <div class="post-list">
+      {% for post in posts %}
+      <a class="post-row" href="/posts/{{ post.id }}">
+        <span class="post-title">{{ post.title or "Untitled" }}</span>
+        <span class="post-meta">r/{{ post.subreddit or "unknown" }} · {{ post.score or 0 }} points · {{ post.comment_count }} comments</span>
+      </a>
+      {% else %}
+      <p class="empty">Collected posts will appear here.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}
