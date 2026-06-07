@@ -282,6 +282,7 @@ class ApifyProvider:
                 run_input=run_input,
                 timeout_secs=self.settings.apify_run_timeout_seconds,
                 max_items=1,
+                logger=None,
             )
         except Exception as exc:  # noqa: BLE001 - provider SDK errors need a stable app error.
             raise ProviderError(f"Apify actor run failed: {_sanitize_error(exc)}") from exc
@@ -321,9 +322,7 @@ class ApifyProvider:
         post_limit: int,
         comment_limit: int,
     ) -> dict[str, Any]:
-        proxy_config: dict[str, Any] = {"useApifyProxy": self.settings.apify_use_apify_proxy}
-        if self.settings.apify_proxy_country:
-            proxy_config["countryCode"] = self.settings.apify_proxy_country
+        proxy_config = self._proxy_configuration()
 
         return {
             "startUrls": [{"url": url, "userData": {"scrapeType": target_type}}],
@@ -353,9 +352,7 @@ class ApifyProvider:
         post_limit: int,
         comment_limit: int,
     ) -> dict[str, Any]:
-        proxy_config: dict[str, Any] = {"useApifyProxy": self.settings.apify_use_apify_proxy}
-        if self.settings.apify_proxy_country:
-            proxy_config["countryCode"] = self.settings.apify_proxy_country
+        proxy_config = self._proxy_configuration()
 
         return {
             "runMode": "PRODUCTION",
@@ -385,6 +382,16 @@ class ApifyProvider:
                 "commentLimit": comment_limit,
             },
         }
+
+    def _proxy_configuration(self) -> dict[str, Any]:
+        proxy_config: dict[str, Any] = {"useApifyProxy": self.settings.apify_use_apify_proxy}
+        if self.settings.apify_proxy_group:
+            proxy_config["apifyProxyGroups"] = [self.settings.apify_proxy_group]
+            proxy_config["groups"] = [self.settings.apify_proxy_group]
+        if self.settings.apify_proxy_country:
+            proxy_config["apifyProxyCountry"] = self.settings.apify_proxy_country
+            proxy_config["countryCode"] = self.settings.apify_proxy_country
+        return proxy_config
 
     def result_from_items(self, items: list[dict[str, Any]]) -> ScrapeResult:
         stats = _empty_stats()

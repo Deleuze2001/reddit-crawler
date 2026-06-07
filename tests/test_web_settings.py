@@ -45,12 +45,13 @@ class WebSettingsTests(unittest.TestCase):
                     "crawlbase_normal_token": "normal-secret",
                     "crawlbase_js_token": "js-secret",
                     "apify_token": "apify-secret",
-                    "apify_actor_id": "apify/cheerio-scraper",
+                    "apify_actor_id": "apify/web-scraper",
                     "apify_run_timeout_seconds": "300",
                     "apify_page_load_timeout_seconds": "90",
                     "apify_page_function_timeout_seconds": "60",
                     "apify_max_request_retries": "2",
                     "apify_max_scroll_height_pixels": "8000",
+                    "apify_proxy_group": "RESIDENTIAL",
                     "apify_proxy_country": "US",
                     "apify_use_apify_proxy": "on",
                     "apify_use_chrome": "on",
@@ -71,6 +72,8 @@ class WebSettingsTests(unittest.TestCase):
         self.assertEqual(captured["crawlbase_js_token"], "js-secret")
         self.assertEqual(captured["apify_token"], "apify-secret")
         self.assertEqual(captured["default_scraper_provider"], "apify")
+        self.assertEqual(captured["apify_actor_id"], "apify/web-scraper")
+        self.assertEqual(captured["apify_proxy_group"], "RESIDENTIAL")
         self.assertEqual(captured["crawlbase_country"], "GB")
 
 

@@ -7,13 +7,14 @@ from app.settings_store import DEFAULT_VALUES, settings_from_values
 
 
 class ApifyProviderTests(unittest.TestCase):
-    def test_build_run_input_uses_standard_cheerio_guardrails(self) -> None:
+    def test_build_run_input_uses_web_scraper_by_default(self) -> None:
         provider = ApifyProvider(
             settings_from_values(
                 DEFAULT_VALUES
                 | {
                     "apify_token": "token",
                     "apify_proxy_country": "GB",
+                    "apify_proxy_group": "RESIDENTIAL",
                     "apify_use_chrome": "true",
                 }
             )
@@ -27,18 +28,20 @@ class ApifyProviderTests(unittest.TestCase):
         self.assertEqual(run_input["maxResultsPerCrawl"], 1)
         self.assertEqual(run_input["maxConcurrency"], 1)
         self.assertEqual(run_input["proxyConfiguration"]["countryCode"], "GB")
-        self.assertEqual(run_input["customData"]["actorId"], "apify/cheerio-scraper")
+        self.assertEqual(run_input["proxyConfiguration"]["apifyProxyCountry"], "GB")
+        self.assertEqual(run_input["proxyConfiguration"]["apifyProxyGroups"], ["RESIDENTIAL"])
+        self.assertEqual(run_input["customData"]["actorId"], "apify/web-scraper")
         self.assertIn("pageFunction", run_input)
-        self.assertNotIn("useChrome", run_input)
-        self.assertNotIn("runMode", run_input)
+        self.assertEqual(run_input["runMode"], "PRODUCTION")
+        self.assertTrue(run_input["useChrome"])
 
-    def test_build_run_input_keeps_web_scraper_browser_options(self) -> None:
+    def test_build_run_input_keeps_cheerio_static_options(self) -> None:
         provider = ApifyProvider(
             settings_from_values(
                 DEFAULT_VALUES
                 | {
                     "apify_token": "token",
-                    "apify_actor_id": "apify/web-scraper",
+                    "apify_actor_id": "apify/cheerio-scraper",
                     "apify_use_chrome": "true",
                 }
             )
@@ -46,11 +49,11 @@ class ApifyProviderTests(unittest.TestCase):
 
         run_input = provider.build_run_input("https://old.reddit.com/comments/abc123/", "post", 1, 50)
 
-        self.assertEqual(run_input["customData"]["actorId"], "apify/web-scraper")
-        self.assertEqual(run_input["runMode"], "PRODUCTION")
-        self.assertTrue(run_input["useChrome"])
-        self.assertEqual(run_input["waitUntil"], ["domcontentloaded"])
-        self.assertIn("maxScrollHeightPixels", run_input)
+        self.assertEqual(run_input["customData"]["actorId"], "apify/cheerio-scraper")
+        self.assertNotIn("runMode", run_input)
+        self.assertNotIn("useChrome", run_input)
+        self.assertNotIn("waitUntil", run_input)
+        self.assertNotIn("maxScrollHeightPixels", run_input)
 
     def test_result_from_subreddit_dataset_item(self) -> None:
         provider = ApifyProvider(settings_from_values(DEFAULT_VALUES | {"apify_token": "token"}))

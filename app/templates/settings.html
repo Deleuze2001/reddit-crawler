@@ -97,6 +97,11 @@
         <input name="apify_proxy_country" maxlength="2" value="{{ public_settings.apify_proxy_country }}">
       </label>
 
+      <label>
+        <span>Proxy Group</span>
+        <input name="apify_proxy_group" value="{{ public_settings.apify_proxy_group }}" placeholder="RESIDENTIAL">
+      </label>
+
       <label class="check">
         <input type="checkbox" name="apify_use_apify_proxy" {% if public_settings.apify_use_apify_proxy %}checked{% endif %}>
         <span>Use Apify Proxy</span>

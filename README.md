@@ -13,9 +13,9 @@ Provider-specific scraping lives behind `app.providers.ScraperProvider`, so the 
 ## Providers
 
 - Crawlbase: uses the Crawling API endpoint with `token`, URL-encoded `url`, `format=json`, gzip, a 95 second default timeout, optional `country`/`device`, and optional JavaScript rendering retry when a normal-token response is empty or returns `pc_status=525`. Crawlbase supports subreddit, post, user, and search jobs.
-- Apify: uses the official `apify-client` package to run a standard Apify scraper actor and read the run's default dataset. The default actor is `apify/cheerio-scraper`, configured with a page function for old Reddit's static HTML. `apify/web-scraper` is also supported by changing the actor in Settings, with browser-specific options such as Chrome, navigation wait, and scroll height.
+- Apify: uses the official `apify-client` package to run a standard Apify scraper actor and read the run's default dataset. The default actor is `apify/web-scraper`, configured with a browser page function for old Reddit. `apify/cheerio-scraper` is also supported by changing the actor in Settings, but Reddit often blocks raw HTTP scraping paths.
 
-The Apify provider currently supports subreddit and post jobs. It uses single-page guardrails (`linkSelector=""`, `maxPagesPerCrawl=1`, `maxResultsPerCrawl=1`, `maxConcurrency=1`) so a job does not accidentally fan out across Reddit.
+The Apify provider currently supports subreddit and post jobs. It uses single-page guardrails (`linkSelector=""`, `maxPagesPerCrawl=1`, `maxResultsPerCrawl=1`, `maxConcurrency=1`) so a job does not accidentally fan out across Reddit. The default Apify proxy group is `RESIDENTIAL`, which is usually more appropriate for social media targets than automatic datacenter proxy selection.
 
 ## Crawl Types
 

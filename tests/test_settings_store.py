@@ -14,6 +14,7 @@ class SettingsStoreTests(unittest.TestCase):
                 "crawlbase_normal_token": " normal ",
                 "crawlbase_js_token": "",
                 "apify_token": " apify ",
+                "apify_proxy_group": "residential",
                 "apify_use_apify_proxy": "false",
                 "crawlbase_country": "gb",
                 "crawlbase_device": "mobile",
@@ -30,6 +31,7 @@ class SettingsStoreTests(unittest.TestCase):
         self.assertEqual(settings.crawlbase_normal_token, "normal")
         self.assertIsNone(settings.crawlbase_js_token)
         self.assertEqual(settings.apify_token, "apify")
+        self.assertEqual(settings.apify_proxy_group, "residential")
         self.assertFalse(settings.apify_use_apify_proxy)
         self.assertEqual(settings.crawlbase_country, "GB")
         self.assertEqual(settings.crawlbase_device, "mobile")

@@ -23,12 +23,13 @@ DEFAULT_VALUES: dict[str, str] = {
     "reddit_default_limit": "25",
     "reddit_max_limit": "100",
     "apify_token": "",
-    "apify_actor_id": "apify/cheerio-scraper",
+    "apify_actor_id": "apify/web-scraper",
     "apify_run_timeout_seconds": "300",
     "apify_page_load_timeout_seconds": "90",
     "apify_page_function_timeout_seconds": "60",
     "apify_max_request_retries": "2",
     "apify_max_scroll_height_pixels": "8000",
+    "apify_proxy_group": "RESIDENTIAL",
     "apify_proxy_country": "US",
     "apify_use_apify_proxy": "true",
     "apify_use_chrome": "true",
@@ -55,6 +56,7 @@ class CrawlerSettings:
     apify_page_function_timeout_seconds: int
     apify_max_request_retries: int
     apify_max_scroll_height_pixels: int
+    apify_proxy_group: str | None
     apify_proxy_country: str | None
     apify_use_apify_proxy: bool
     apify_use_chrome: bool
@@ -117,6 +119,7 @@ def settings_from_values(values: dict[str, Any]) -> CrawlerSettings:
     if provider not in PROVIDER_CHOICES:
         provider = "crawlbase"
     country = _country_or_none(values.get("crawlbase_country"))
+    apify_proxy_group = _text_or_none(values.get("apify_proxy_group"))
     apify_country = _country_or_none(values.get("apify_proxy_country"))
     device = str(values.get("crawlbase_device") or "desktop").strip().lower()
     if device not in DEVICE_CHOICES:
@@ -183,6 +186,7 @@ def settings_from_values(values: dict[str, Any]) -> CrawlerSettings:
             minimum=0,
             maximum=100000,
         ),
+        apify_proxy_group=apify_proxy_group,
         apify_proxy_country=apify_country,
         apify_use_apify_proxy=_bool(values.get("apify_use_apify_proxy"), True),
         apify_use_chrome=_bool(values.get("apify_use_chrome"), True),
@@ -209,6 +213,7 @@ def public_settings(settings: CrawlerSettings) -> dict[str, Any]:
         "apify_page_function_timeout_seconds": settings.apify_page_function_timeout_seconds,
         "apify_max_request_retries": settings.apify_max_request_retries,
         "apify_max_scroll_height_pixels": settings.apify_max_scroll_height_pixels,
+        "apify_proxy_group": settings.apify_proxy_group or "",
         "apify_proxy_country": settings.apify_proxy_country or "",
         "apify_use_apify_proxy": settings.apify_use_apify_proxy,
         "apify_use_chrome": settings.apify_use_chrome,
@@ -216,6 +221,11 @@ def public_settings(settings: CrawlerSettings) -> dict[str, Any]:
 
 
 def _secret_or_none(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _text_or_none(value: Any) -> str | None:
     text = str(value or "").strip()
     return text or None
 

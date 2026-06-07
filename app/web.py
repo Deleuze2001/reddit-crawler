@@ -120,12 +120,13 @@ def update_settings(
     clear_js_token: str | None = Form(None),
     apify_token: str = Form(""),
     clear_apify_token: str | None = Form(None),
-    apify_actor_id: str = Form("apify/cheerio-scraper"),
+    apify_actor_id: str = Form("apify/web-scraper"),
     apify_run_timeout_seconds: int = Form(300),
     apify_page_load_timeout_seconds: int = Form(90),
     apify_page_function_timeout_seconds: int = Form(60),
     apify_max_request_retries: int = Form(2),
     apify_max_scroll_height_pixels: int = Form(8000),
+    apify_proxy_group: str = Form("RESIDENTIAL"),
     apify_proxy_country: str = Form("US"),
     apify_use_apify_proxy: str | None = Form(None),
     apify_use_chrome: str | None = Form(None),
@@ -153,6 +154,7 @@ def update_settings(
             apify_page_function_timeout_seconds=apify_page_function_timeout_seconds,
             apify_max_request_retries=apify_max_request_retries,
             apify_max_scroll_height_pixels=apify_max_scroll_height_pixels,
+            apify_proxy_group=apify_proxy_group,
             apify_proxy_country=apify_proxy_country,
             apify_use_apify_proxy=apify_use_apify_proxy == "on",
             apify_use_chrome=apify_use_chrome == "on",
@@ -348,6 +350,7 @@ def _normalize_settings_input(
     apify_page_function_timeout_seconds: int,
     apify_max_request_retries: int,
     apify_max_scroll_height_pixels: int,
+    apify_proxy_group: str,
     apify_proxy_country: str,
     apify_use_apify_proxy: bool,
     apify_use_chrome: bool,
@@ -369,6 +372,7 @@ def _normalize_settings_input(
     apify_country = apify_proxy_country.strip().upper()
     if apify_country and (len(apify_country) != 2 or not apify_country.isalpha()):
         raise ValueError("Apify proxy country must be a two-letter code, or blank.")
+    clean_apify_proxy_group = apify_proxy_group.strip().upper()
 
     device = crawlbase_device.strip().lower()
     if device not in settings_store.DEVICE_CHOICES:
@@ -413,6 +417,7 @@ def _normalize_settings_input(
         "apify_page_function_timeout_seconds": apify_page_function_timeout_seconds,
         "apify_max_request_retries": apify_max_request_retries,
         "apify_max_scroll_height_pixels": apify_max_scroll_height_pixels,
+        "apify_proxy_group": clean_apify_proxy_group,
         "apify_proxy_country": apify_country,
         "apify_use_apify_proxy": str(apify_use_apify_proxy).lower(),
         "apify_use_chrome": str(apify_use_chrome).lower(),
