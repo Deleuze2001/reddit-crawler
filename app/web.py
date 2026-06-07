@@ -9,14 +9,15 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import database, reddit, repository
+from . import database, reddit, repository, settings_store
 from .config import get_settings
+from .settings_store import CrawlerSettings
 
 
 BASE_DIR = Path(__file__).resolve().parent
 settings = get_settings()
 
-app = FastAPI(title=settings.web_app_title)
+app = FastAPI(title="Reddit Crawlbase Collector")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -45,7 +46,7 @@ def create_job(
     target_type: str = Form(...),
     target: str = Form(...),
     sort: str = Form("hot"),
-    post_limit: int = Form(settings.reddit_default_limit),
+    post_limit: int = Form(25),
     comment_limit: int = Form(100),
     subreddit_filter: str = Form(""),
     include_comments: str | None = Form(None),
@@ -62,12 +63,22 @@ def create_job(
         "use_js": use_js,
     }
 
-    try:
-        normalized = _normalize_job_input(target_type, target, sort, post_limit, comment_limit, subreddit_filter, use_js)
-    except ValueError as exc:
-        return _render_index(request, error=str(exc), form=form, status_code=400)
-
     with database.connection(settings) as conn:
+        crawler_settings = settings_store.get_crawler_settings(conn)
+        try:
+            normalized = _normalize_job_input(
+                target_type,
+                target,
+                sort,
+                post_limit,
+                comment_limit,
+                subreddit_filter,
+                use_js,
+                crawler_settings,
+            )
+        except ValueError as exc:
+            return _render_index(request, error=str(exc), form=form, status_code=400)
+
         job_id = repository.create_job(
             conn,
             target_type=normalized["target_type"],
@@ -80,9 +91,54 @@ def create_job(
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request) -> HTMLResponse:
+    return _render_settings(request, saved=request.query_params.get("saved") == "1")
+
+
+@app.post("/settings", response_class=HTMLResponse)
+def update_settings(
+    request: Request,
+    app_title: str = Form("Reddit Crawlbase Collector"),
+    crawlbase_normal_token: str = Form(""),
+    crawlbase_js_token: str = Form(""),
+    clear_normal_token: str | None = Form(None),
+    clear_js_token: str | None = Form(None),
+    crawlbase_country: str = Form("US"),
+    crawlbase_device: str = Form("desktop"),
+    crawlbase_timeout_seconds: float = Form(95.0),
+    crawlbase_rate_limit_seconds: float = Form(2.0),
+    collector_poll_seconds: float = Form(5.0),
+    reddit_default_limit: int = Form(25),
+    reddit_max_limit: int = Form(100),
+) -> Any:
+    try:
+        updates = _normalize_settings_input(
+            app_title=app_title,
+            crawlbase_normal_token=crawlbase_normal_token,
+            crawlbase_js_token=crawlbase_js_token,
+            clear_normal_token=clear_normal_token == "on",
+            clear_js_token=clear_js_token == "on",
+            crawlbase_country=crawlbase_country,
+            crawlbase_device=crawlbase_device,
+            crawlbase_timeout_seconds=crawlbase_timeout_seconds,
+            crawlbase_rate_limit_seconds=crawlbase_rate_limit_seconds,
+            collector_poll_seconds=collector_poll_seconds,
+            reddit_default_limit=reddit_default_limit,
+            reddit_max_limit=reddit_max_limit,
+        )
+    except ValueError as exc:
+        return _render_settings(request, error=str(exc), status_code=400)
+
+    with database.connection(settings) as conn:
+        settings_store.update_crawler_settings(conn, updates)
+    return RedirectResponse("/settings?saved=1", status_code=303)
+
+
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
 def job_detail(request: Request, job_id: str) -> HTMLResponse:
     with database.connection(settings) as conn:
+        crawler_settings = settings_store.get_crawler_settings(conn)
         job = repository.get_job(conn, job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -92,7 +148,7 @@ def job_detail(request: Request, job_id: str) -> HTMLResponse:
         "job.html",
         {
             "request": request,
-            "title": settings.web_app_title,
+            "title": crawler_settings.app_title,
             "job": job,
             "posts": posts,
             "autorefresh": job["status"] in {"queued", "running"},
@@ -104,6 +160,7 @@ def job_detail(request: Request, job_id: str) -> HTMLResponse:
 @app.get("/posts/{post_id}", response_class=HTMLResponse)
 def post_detail(request: Request, post_id: str) -> HTMLResponse:
     with database.connection(settings) as conn:
+        crawler_settings = settings_store.get_crawler_settings(conn)
         post = repository.get_post(conn, post_id)
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
@@ -113,7 +170,7 @@ def post_detail(request: Request, post_id: str) -> HTMLResponse:
         "post.html",
         {
             "request": request,
-            "title": settings.web_app_title,
+            "title": crawler_settings.app_title,
             "post": post,
             "comments": comments,
             "format_dt": format_dt,
@@ -129,6 +186,7 @@ def _render_index(
     status_code: int = 200,
 ) -> HTMLResponse:
     with database.connection(settings) as conn:
+        crawler_settings = settings_store.get_crawler_settings(conn)
         stats = repository.dashboard_stats(conn)
         jobs = repository.list_recent_jobs(conn)
         posts = repository.list_recent_posts(conn)
@@ -137,14 +195,39 @@ def _render_index(
         "index.html",
         {
             "request": request,
-            "title": settings.web_app_title,
+            "title": crawler_settings.app_title,
             "stats": stats,
             "jobs": jobs,
             "posts": posts,
             "error": error,
             "form": form or {},
-            "settings": settings,
+            "settings": crawler_settings,
             "format_dt": format_dt,
+        },
+        status_code=status_code,
+    )
+
+
+def _render_settings(
+    request: Request,
+    *,
+    error: str | None = None,
+    saved: bool = False,
+    status_code: int = 200,
+) -> HTMLResponse:
+    with database.connection(settings) as conn:
+        crawler_settings = settings_store.get_crawler_settings(conn)
+
+    return templates.TemplateResponse(
+        "settings.html",
+        {
+            "request": request,
+            "title": crawler_settings.app_title,
+            "runtime": crawler_settings,
+            "public_settings": settings_store.public_settings(crawler_settings),
+            "device_choices": sorted(settings_store.DEVICE_CHOICES),
+            "error": error,
+            "saved": saved,
         },
         status_code=status_code,
     )
@@ -158,11 +241,12 @@ def _normalize_job_input(
     comment_limit: int,
     subreddit_filter: str,
     use_js: str | None,
+    crawler_settings: CrawlerSettings,
 ) -> dict[str, Any]:
     clean_type = target_type.strip().lower()
     clean_target = target.strip()
     clean_sort = sort.strip().lower()
-    limit = reddit.clamp_limit(post_limit, settings.reddit_default_limit, settings.reddit_max_limit)
+    limit = reddit.clamp_limit(post_limit, crawler_settings.reddit_default_limit, crawler_settings.reddit_max_limit)
     options: dict[str, Any] = {
         "comment_limit": reddit.clamp_limit(comment_limit, 100, 500),
     }
@@ -196,6 +280,67 @@ def _normalize_job_input(
         "post_limit": limit,
         "options": options,
     }
+
+
+def _normalize_settings_input(
+    *,
+    app_title: str,
+    crawlbase_normal_token: str,
+    crawlbase_js_token: str,
+    clear_normal_token: bool,
+    clear_js_token: bool,
+    crawlbase_country: str,
+    crawlbase_device: str,
+    crawlbase_timeout_seconds: float,
+    crawlbase_rate_limit_seconds: float,
+    collector_poll_seconds: float,
+    reddit_default_limit: int,
+    reddit_max_limit: int,
+) -> dict[str, Any]:
+    title = app_title.strip() or settings_store.DEFAULT_VALUES["app_title"]
+    country = crawlbase_country.strip().upper()
+    if country and (len(country) != 2 or not country.isalpha()):
+        raise ValueError("Country must be a two-letter code, or blank.")
+
+    device = crawlbase_device.strip().lower()
+    if device not in settings_store.DEVICE_CHOICES:
+        raise ValueError("Choose desktop, tablet, or mobile.")
+
+    if crawlbase_timeout_seconds < 30 or crawlbase_timeout_seconds > 300:
+        raise ValueError("Timeout must be between 30 and 300 seconds.")
+    if crawlbase_rate_limit_seconds < 0 or crawlbase_rate_limit_seconds > 60:
+        raise ValueError("Rate limit delay must be between 0 and 60 seconds.")
+    if collector_poll_seconds < 1 or collector_poll_seconds > 300:
+        raise ValueError("Collector poll delay must be between 1 and 300 seconds.")
+    if reddit_max_limit < 1 or reddit_max_limit > 500:
+        raise ValueError("Maximum post limit must be between 1 and 500.")
+    if reddit_default_limit < 1 or reddit_default_limit > reddit_max_limit:
+        raise ValueError("Default post limit must be between 1 and the maximum post limit.")
+
+    updates: dict[str, Any] = {
+        "app_title": title,
+        "crawlbase_country": country,
+        "crawlbase_device": device,
+        "crawlbase_timeout_seconds": crawlbase_timeout_seconds,
+        "crawlbase_rate_limit_seconds": crawlbase_rate_limit_seconds,
+        "collector_poll_seconds": collector_poll_seconds,
+        "reddit_default_limit": reddit_default_limit,
+        "reddit_max_limit": reddit_max_limit,
+    }
+
+    normal_token = crawlbase_normal_token.strip()
+    js_token = crawlbase_js_token.strip()
+    if clear_normal_token:
+        updates["crawlbase_normal_token"] = ""
+    elif normal_token:
+        updates["crawlbase_normal_token"] = normal_token
+
+    if clear_js_token:
+        updates["crawlbase_js_token"] = ""
+    elif js_token:
+        updates["crawlbase_js_token"] = js_token
+
+    return updates
 
 
 def format_dt(value: Any) -> str:

@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from .config import Settings, get_settings
+from .settings_store import CrawlerSettings
 
 
 CRAWLBASE_ENDPOINT = "https://api.crawlbase.com/"
@@ -58,9 +58,12 @@ class CrawlbaseResult:
 
 
 class CrawlbaseClient:
-    def __init__(self, settings: Settings | None = None) -> None:
-        self.settings = settings or get_settings()
+    def __init__(self, settings: CrawlerSettings) -> None:
+        self.settings = settings
         self._last_request_at = 0.0
+
+    def configure(self, settings: CrawlerSettings) -> None:
+        self.settings = settings
 
     @property
     def has_token(self) -> bool:
@@ -75,7 +78,7 @@ class CrawlbaseClient:
         render_options: dict[str, Any] | None = None,
     ) -> CrawlbaseResult:
         if not self.has_token:
-            raise CrawlbaseError("CRAWLBASE_NORMAL_TOKEN or CRAWLBASE_JS_TOKEN must be set.")
+            raise CrawlbaseError("Add a Crawlbase normal or JavaScript token in Settings.")
 
         first = self._fetch_once(
             target_url,

@@ -1,3 +1,24 @@
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    is_secret BOOLEAN NOT NULL DEFAULT false,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO app_settings (key, value, is_secret)
+VALUES
+    ('app_title', 'Reddit Crawlbase Collector', false),
+    ('crawlbase_normal_token', '', true),
+    ('crawlbase_js_token', '', true),
+    ('crawlbase_country', 'US', false),
+    ('crawlbase_device', 'desktop', false),
+    ('crawlbase_timeout_seconds', '95', false),
+    ('crawlbase_rate_limit_seconds', '2.0', false),
+    ('collector_poll_seconds', '5', false),
+    ('reddit_default_limit', '25', false),
+    ('reddit_max_limit', '100', false)
+ON CONFLICT (key) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS crawl_jobs (
     id UUID PRIMARY KEY,
     target_type TEXT NOT NULL CHECK (target_type IN ('subreddit', 'post', 'user', 'search')),

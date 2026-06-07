@@ -4,32 +4,39 @@ import time
 import traceback
 from typing import Any
 
-from . import database, reddit, repository
-from .config import Settings, get_settings
+from . import database, reddit, repository, settings_store
+from .config import get_settings
 from .crawlbase import CrawlbaseClient, CrawlbaseError
+from .settings_store import CrawlerSettings
 
 
 def main() -> None:
     settings = get_settings()
     database.run_migrations(settings)
-    client = CrawlbaseClient(settings)
+    with database.connection(settings) as conn:
+        crawler_settings = settings_store.get_crawler_settings(conn)
+    client = CrawlbaseClient(crawler_settings)
 
     print("collector ready", flush=True)
     while True:
-        if not client.has_token:
-            print("collector waiting for CRAWLBASE_NORMAL_TOKEN or CRAWLBASE_JS_TOKEN", flush=True)
-            time.sleep(max(30.0, settings.collector_poll_seconds))
+        with database.connection(settings) as conn:
+            crawler_settings = settings_store.get_crawler_settings(conn)
+        client.configure(crawler_settings)
+
+        if not crawler_settings.has_crawlbase_token:
+            print("collector waiting for a Crawlbase token saved from the web UI", flush=True)
+            time.sleep(max(30.0, crawler_settings.collector_poll_seconds))
             continue
 
         job = repository.claim_next_job(settings)
         if job is None:
-            time.sleep(settings.collector_poll_seconds)
+            time.sleep(crawler_settings.collector_poll_seconds)
             continue
 
         print(f"collector claimed job {job['id']} ({job['target_type']} {job['target']})", flush=True)
         with database.connection(settings) as conn:
             try:
-                stats, last_response = process_job(conn, job, client, settings)
+                stats, last_response = process_job(conn, job, client, crawler_settings)
                 repository.complete_job(conn, str(job["id"]), stats=stats, last_response=last_response)
                 print(f"collector completed job {job['id']} stats={stats}", flush=True)
             except Exception as exc:  # noqa: BLE001 - job errors need to be captured in the database.
@@ -46,7 +53,7 @@ def process_job(
     conn,
     job: dict[str, Any],
     client: CrawlbaseClient,
-    settings: Settings,
+    settings: CrawlerSettings,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     options = job.get("options") or {}
     limit = reddit.clamp_limit(job.get("post_limit"), settings.reddit_default_limit, settings.reddit_max_limit)

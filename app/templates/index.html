@@ -29,6 +29,11 @@
   <i data-lucide="circle-alert" aria-hidden="true"></i>
   <span>{{ error }}</span>
 </div>
+{% elif not settings.has_crawlbase_token %}
+<div class="alert" role="status">
+  <i data-lucide="key-round" aria-hidden="true"></i>
+  <span>Crawlbase token missing. <a href="/settings">Open settings</a>.</span>
+</div>
 {% endif %}
 
 <section class="workbench">

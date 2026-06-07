@@ -65,6 +65,7 @@ a:hover {
 .topnav a {
   color: var(--muted);
   font-size: 0.95rem;
+  margin-left: 14px;
 }
 
 .shell {
@@ -127,6 +128,24 @@ a:hover {
   flex: 0 0 auto;
 }
 
+.alert a {
+  color: var(--red);
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.notice {
+  align-items: center;
+  background: #e5f5ef;
+  border: 1px solid #bfe5d6;
+  border-radius: var(--radius);
+  color: var(--green);
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 13px 14px;
+}
+
 .workbench,
 .content-grid {
   margin-top: 20px;
@@ -181,6 +200,37 @@ a:hover {
   display: grid;
   gap: 14px;
   grid-template-columns: 170px minmax(260px, 1fr) repeat(4, 130px);
+}
+
+.settings-form {
+  margin-top: 20px;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-grid .wide {
+  grid-column: span 2;
+}
+
+.settings-section {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+
+.settings-section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 14px;
+}
+
+.secret-field input::placeholder {
+  color: var(--green);
+  font-weight: 800;
+  opacity: 1;
 }
 
 label span {
@@ -442,8 +492,13 @@ td {
   }
 
   .form-grid,
+  .settings-grid,
   .content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-grid .wide {
+    grid-column: auto;
   }
 }
 

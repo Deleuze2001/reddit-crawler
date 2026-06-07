@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="detail-head">
+  <a class="back-link" href="/">
+    <i data-lucide="arrow-left" aria-hidden="true"></i>
+    <span>Dashboard</span>
+  </a>
+  <div class="title-row">
+    <div>
+      <span class="eyebrow">Runtime</span>
+      <h1>Settings</h1>
+    </div>
+  </div>
+</section>
+
+{% if error %}
+<div class="alert" role="alert">
+  <i data-lucide="circle-alert" aria-hidden="true"></i>
+  <span>{{ error }}</span>
+</div>
+{% elif saved %}
+<div class="notice" role="status">
+  <i data-lucide="check-circle" aria-hidden="true"></i>
+  <span>Settings saved.</span>
+</div>
+{% endif %}
+
+<form class="panel settings-form" action="/settings" method="post">
+  <div class="panel-heading">
+    <h2>Application</h2>
+    <button class="primary-button" type="submit">
+      <i data-lucide="save" aria-hidden="true"></i>
+      <span>Save</span>
+    </button>
+  </div>
+
+  <div class="settings-grid">
+    <label class="wide">
+      <span>Title</span>
+      <input name="app_title" value="{{ public_settings.app_title }}" required>
+    </label>
+  </div>
+
+  <div class="settings-section">
+    <h2>Crawlbase</h2>
+    <div class="settings-grid">
+      <label class="wide secret-field">
+        <span>Normal Token</span>
+        <input type="password" name="crawlbase_normal_token" autocomplete="off" placeholder="{% if public_settings.crawlbase_normal_token_saved %}Saved{% endif %}">
+      </label>
+      <label class="check">
+        <input type="checkbox" name="clear_normal_token">
+        <span>Clear normal token</span>
+      </label>
+
+      <label class="wide secret-field">
+        <span>JavaScript Token</span>
+        <input type="password" name="crawlbase_js_token" autocomplete="off" placeholder="{% if public_settings.crawlbase_js_token_saved %}Saved{% endif %}">
+      </label>
+      <label class="check">
+        <input type="checkbox" name="clear_js_token">
+        <span>Clear JS token</span>
+      </label>
+
+      <label>
+        <span>Country</span>
+        <input name="crawlbase_country" maxlength="2" value="{{ public_settings.crawlbase_country }}">
+      </label>
+
+      <label>
+        <span>Device</span>
+        <select name="crawlbase_device">
+          {% for device in device_choices %}
+          <option value="{{ device }}" {% if public_settings.crawlbase_device == device %}selected{% endif %}>{{ device|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        <span>Timeout</span>
+        <input type="number" name="crawlbase_timeout_seconds" min="30" max="300" step="1" value="{{ public_settings.crawlbase_timeout_seconds|int }}">
+      </label>
+
+      <label>
+        <span>Request Delay</span>
+        <input type="number" name="crawlbase_rate_limit_seconds" min="0" max="60" step="0.1" value="{{ public_settings.crawlbase_rate_limit_seconds }}">
+      </label>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Collector</h2>
+    <div class="settings-grid">
+      <label>
+        <span>Poll Delay</span>
+        <input type="number" name="collector_poll_seconds" min="1" max="300" step="1" value="{{ public_settings.collector_poll_seconds|int }}">
+      </label>
+      <label>
+        <span>Default Posts</span>
+        <input type="number" name="reddit_default_limit" min="1" max="{{ public_settings.reddit_max_limit }}" value="{{ public_settings.reddit_default_limit }}">
+      </label>
+      <label>
+        <span>Max Posts</span>
+        <input type="number" name="reddit_max_limit" min="1" max="500" value="{{ public_settings.reddit_max_limit }}">
+      </label>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -21,6 +21,8 @@ def connection(
     autocommit: bool = True,
 ) -> Iterator[psycopg.Connection]:
     resolved = settings or get_settings()
+    if not resolved.database_url:
+        raise RuntimeError("DATABASE_URL must be set before the app can connect to PostgreSQL.")
     conn = psycopg.connect(
         resolved.database_url,
         autocommit=autocommit,
