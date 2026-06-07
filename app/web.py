@@ -50,7 +50,7 @@ def create_job(
     subreddit_filter: str = Form(""),
     include_comments: str | None = Form(None),
     use_js: str | None = Form(None),
-) -> HTMLResponse | RedirectResponse:
+) -> Any:
     form = {
         "target_type": target_type,
         "target": target,
