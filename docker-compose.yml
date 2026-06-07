@@ -1,0 +1,53 @@
+name: reddit-crawler
+
+services:
+  shared-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reddit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reddit}
+      POSTGRES_DB: ${POSTGRES_DB:-reddit_crawler}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reddit} -d ${POSTGRES_DB:-reddit_crawler}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reddit}:${POSTGRES_PASSWORD:-reddit}@shared-db:5432/${POSTGRES_DB:-reddit_crawler}
+      WEB_APP_TITLE: ${WEB_APP_TITLE:-Reddit Crawlbase Collector}
+      REDDIT_DEFAULT_LIMIT: ${REDDIT_DEFAULT_LIMIT:-25}
+      REDDIT_MAX_LIMIT: ${REDDIT_MAX_LIMIT:-100}
+    depends_on:
+      shared-db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  collector:
+    build:
+      context: .
+      dockerfile: docker/collector.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reddit}:${POSTGRES_PASSWORD:-reddit}@shared-db:5432/${POSTGRES_DB:-reddit_crawler}
+      CRAWLBASE_NORMAL_TOKEN: ${CRAWLBASE_NORMAL_TOKEN:-}
+      CRAWLBASE_JS_TOKEN: ${CRAWLBASE_JS_TOKEN:-}
+      CRAWLBASE_COUNTRY: ${CRAWLBASE_COUNTRY:-US}
+      CRAWLBASE_DEVICE: ${CRAWLBASE_DEVICE:-desktop}
+      CRAWLBASE_TIMEOUT_SECONDS: ${CRAWLBASE_TIMEOUT_SECONDS:-95}
+      CRAWLBASE_RATE_LIMIT_SECONDS: ${CRAWLBASE_RATE_LIMIT_SECONDS:-2.0}
+      COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-5}
+      REDDIT_DEFAULT_LIMIT: ${REDDIT_DEFAULT_LIMIT:-25}
+      REDDIT_MAX_LIMIT: ${REDDIT_MAX_LIMIT:-100}
+    depends_on:
+      shared-db:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
