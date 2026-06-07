@@ -36,6 +36,10 @@
     <strong>{{ job.stats.get("comments", 0) }}</strong>
   </div>
   <div class="metric">
+    <span class="metric-label">Provider</span>
+    <strong class="metric-small">{{ job.provider or "crawlbase" }}</strong>
+  </div>
+  <div class="metric">
     <span class="metric-label">Started</span>
     <strong class="metric-small">{{ format_dt(job.started_at) or "Pending" }}</strong>
   </div>
@@ -76,9 +80,23 @@
 
   <div class="panel metadata-panel">
     <div class="panel-heading">
-      <h2>Crawlbase</h2>
+      <h2>Provider</h2>
     </div>
     <dl class="metadata">
+      {% if (job.provider or "crawlbase") == "apify" %}
+      <dt>actor</dt>
+      <dd>{{ job.last_response.get("actor_id", "") }}</dd>
+      <dt>status</dt>
+      <dd>{{ job.last_response.get("status", "") }}</dd>
+      <dt>run</dt>
+      <dd>{{ job.last_response.get("run_id", "") }}</dd>
+      <dt>dataset</dt>
+      <dd>{{ job.last_response.get("default_dataset_id", "") }}</dd>
+      <dt>source</dt>
+      <dd>{{ job.last_response.get("source", "") }}</dd>
+      <dt>target_url</dt>
+      <dd>{{ job.last_response.get("target_url", "") }}</dd>
+      {% else %}
       <dt>pc_status</dt>
       <dd>{{ job.last_response.get("pc_status", "") }}</dd>
       <dt>original_status</dt>
@@ -89,6 +107,7 @@
       <dd>{{ job.last_response.get("used_js", false) }}</dd>
       <dt>rid</dt>
       <dd>{{ job.last_response.get("rid", "") }}</dd>
+      {% endif %}
     </dl>
   </div>
 </section>

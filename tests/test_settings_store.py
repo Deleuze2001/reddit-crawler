@@ -10,8 +10,11 @@ class SettingsStoreTests(unittest.TestCase):
         settings = settings_store.settings_from_values(
             {
                 "app_title": "  Custom Crawler  ",
+                "default_scraper_provider": "apify",
                 "crawlbase_normal_token": " normal ",
                 "crawlbase_js_token": "",
+                "apify_token": " apify ",
+                "apify_use_apify_proxy": "false",
                 "crawlbase_country": "gb",
                 "crawlbase_device": "mobile",
                 "crawlbase_timeout_seconds": "10",
@@ -23,8 +26,11 @@ class SettingsStoreTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.app_title, "Custom Crawler")
+        self.assertEqual(settings.default_scraper_provider, "apify")
         self.assertEqual(settings.crawlbase_normal_token, "normal")
         self.assertIsNone(settings.crawlbase_js_token)
+        self.assertEqual(settings.apify_token, "apify")
+        self.assertFalse(settings.apify_use_apify_proxy)
         self.assertEqual(settings.crawlbase_country, "GB")
         self.assertEqual(settings.crawlbase_device, "mobile")
         self.assertEqual(settings.crawlbase_timeout_seconds, 30.0)
@@ -39,6 +45,7 @@ class SettingsStoreTests(unittest.TestCase):
             | {
                 "crawlbase_normal_token": "secret-token",
                 "crawlbase_js_token": "js-secret",
+                "apify_token": "apify-secret",
             }
         )
 
@@ -46,8 +53,10 @@ class SettingsStoreTests(unittest.TestCase):
 
         self.assertTrue(public["crawlbase_normal_token_saved"])
         self.assertTrue(public["crawlbase_js_token_saved"])
+        self.assertTrue(public["apify_token_saved"])
         self.assertNotIn("secret-token", public.values())
         self.assertNotIn("js-secret", public.values())
+        self.assertNotIn("apify-secret", public.values())
 
 
 if __name__ == "__main__":

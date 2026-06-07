@@ -17,6 +17,7 @@ class WebSettingsTests(unittest.TestCase):
             | {
                 "crawlbase_normal_token": "normal-secret",
                 "crawlbase_js_token": "js-secret",
+                "apify_token": "apify-secret",
             }
         )
 
@@ -27,6 +28,7 @@ class WebSettingsTests(unittest.TestCase):
         self.assertIn("Saved", response.text)
         self.assertNotIn("normal-secret", response.text)
         self.assertNotIn("js-secret", response.text)
+        self.assertNotIn("apify-secret", response.text)
 
     def test_settings_post_saves_tokens(self) -> None:
         captured: dict[str, str] = {}
@@ -39,8 +41,19 @@ class WebSettingsTests(unittest.TestCase):
                 "/settings",
                 data={
                     "app_title": "Test Crawler",
+                    "default_scraper_provider": "apify",
                     "crawlbase_normal_token": "normal-secret",
                     "crawlbase_js_token": "js-secret",
+                    "apify_token": "apify-secret",
+                    "apify_actor_id": "apify/cheerio-scraper",
+                    "apify_run_timeout_seconds": "300",
+                    "apify_page_load_timeout_seconds": "90",
+                    "apify_page_function_timeout_seconds": "60",
+                    "apify_max_request_retries": "2",
+                    "apify_max_scroll_height_pixels": "8000",
+                    "apify_proxy_country": "US",
+                    "apify_use_apify_proxy": "on",
+                    "apify_use_chrome": "on",
                     "crawlbase_country": "GB",
                     "crawlbase_device": "desktop",
                     "crawlbase_timeout_seconds": "95",
@@ -56,6 +69,8 @@ class WebSettingsTests(unittest.TestCase):
         self.assertEqual(response.headers["location"], "/settings?saved=1")
         self.assertEqual(captured["crawlbase_normal_token"], "normal-secret")
         self.assertEqual(captured["crawlbase_js_token"], "js-secret")
+        self.assertEqual(captured["apify_token"], "apify-secret")
+        self.assertEqual(captured["default_scraper_provider"], "apify")
         self.assertEqual(captured["crawlbase_country"], "GB")
 
 

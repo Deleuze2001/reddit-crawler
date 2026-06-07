@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 INSERT INTO app_settings (key, value, is_secret)
 VALUES
-    ('app_title', 'Reddit Crawlbase Collector', false),
+    ('app_title', 'Reddit Scraper Collector', false),
+    ('default_scraper_provider', 'crawlbase', false),
     ('crawlbase_normal_token', '', true),
     ('crawlbase_js_token', '', true),
     ('crawlbase_country', 'US', false),
@@ -16,13 +17,24 @@ VALUES
     ('crawlbase_rate_limit_seconds', '2.0', false),
     ('collector_poll_seconds', '5', false),
     ('reddit_default_limit', '25', false),
-    ('reddit_max_limit', '100', false)
+    ('reddit_max_limit', '100', false),
+    ('apify_token', '', true),
+    ('apify_actor_id', 'apify/cheerio-scraper', false),
+    ('apify_run_timeout_seconds', '300', false),
+    ('apify_page_load_timeout_seconds', '90', false),
+    ('apify_page_function_timeout_seconds', '60', false),
+    ('apify_max_request_retries', '2', false),
+    ('apify_max_scroll_height_pixels', '8000', false),
+    ('apify_proxy_country', 'US', false),
+    ('apify_use_apify_proxy', 'true', false),
+    ('apify_use_chrome', 'true', false)
 ON CONFLICT (key) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS crawl_jobs (
     id UUID PRIMARY KEY,
     target_type TEXT NOT NULL CHECK (target_type IN ('subreddit', 'post', 'user', 'search')),
     target TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'crawlbase' CHECK (provider IN ('crawlbase', 'apify')),
     sort TEXT NOT NULL DEFAULT 'hot',
     post_limit INTEGER NOT NULL DEFAULT 25 CHECK (post_limit BETWEEN 1 AND 500),
     include_comments BOOLEAN NOT NULL DEFAULT false,
@@ -36,6 +48,9 @@ CREATE TABLE IF NOT EXISTS crawl_jobs (
     stats JSONB NOT NULL DEFAULT '{}'::jsonb,
     last_response JSONB NOT NULL DEFAULT '{}'::jsonb
 );
+
+ALTER TABLE IF EXISTS crawl_jobs
+    ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'crawlbase';
 
 CREATE INDEX IF NOT EXISTS idx_crawl_jobs_status_requested_at
     ON crawl_jobs (status, requested_at);

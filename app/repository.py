@@ -15,6 +15,7 @@ def create_job(
     *,
     target_type: str,
     target: str,
+    provider: str,
     sort: str,
     post_limit: int,
     include_comments: bool,
@@ -24,12 +25,12 @@ def create_job(
     row = conn.execute(
         """
         INSERT INTO crawl_jobs (
-            id, target_type, target, sort, post_limit, include_comments, options
+            id, target_type, target, provider, sort, post_limit, include_comments, options
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
-        (job_id, target_type, target, sort, post_limit, include_comments, Jsonb(options or {})),
+        (job_id, target_type, target, provider, sort, post_limit, include_comments, Jsonb(options or {})),
     ).fetchone()
     return str(row["id"])
 

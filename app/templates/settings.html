@@ -40,6 +40,73 @@
       <span>Title</span>
       <input name="app_title" value="{{ public_settings.app_title }}" required>
     </label>
+    <label>
+      <span>Default Provider</span>
+      <select name="default_scraper_provider">
+        {% for provider in provider_choices %}
+        <option value="{{ provider }}" {% if public_settings.default_scraper_provider == provider %}selected{% endif %}>{{ provider|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="settings-section">
+    <h2>Apify</h2>
+    <div class="settings-grid">
+      <label class="wide secret-field">
+        <span>API Token</span>
+        <input type="password" name="apify_token" autocomplete="off" placeholder="{% if public_settings.apify_token_saved %}Saved{% endif %}">
+      </label>
+      <label class="check">
+        <input type="checkbox" name="clear_apify_token">
+        <span>Clear Apify token</span>
+      </label>
+
+      <label class="wide">
+        <span>Actor</span>
+        <input name="apify_actor_id" value="{{ public_settings.apify_actor_id }}" required>
+      </label>
+
+      <label>
+        <span>Run Timeout</span>
+        <input type="number" name="apify_run_timeout_seconds" min="30" max="1800" step="1" value="{{ public_settings.apify_run_timeout_seconds }}">
+      </label>
+
+      <label>
+        <span>Page Load</span>
+        <input type="number" name="apify_page_load_timeout_seconds" min="10" max="300" step="1" value="{{ public_settings.apify_page_load_timeout_seconds }}">
+      </label>
+
+      <label>
+        <span>Page Function</span>
+        <input type="number" name="apify_page_function_timeout_seconds" min="5" max="300" step="1" value="{{ public_settings.apify_page_function_timeout_seconds }}">
+      </label>
+
+      <label>
+        <span>Retries</span>
+        <input type="number" name="apify_max_request_retries" min="0" max="10" step="1" value="{{ public_settings.apify_max_request_retries }}">
+      </label>
+
+      <label>
+        <span>Scroll Pixels</span>
+        <input type="number" name="apify_max_scroll_height_pixels" min="0" max="100000" step="1000" value="{{ public_settings.apify_max_scroll_height_pixels }}">
+      </label>
+
+      <label>
+        <span>Proxy Country</span>
+        <input name="apify_proxy_country" maxlength="2" value="{{ public_settings.apify_proxy_country }}">
+      </label>
+
+      <label class="check">
+        <input type="checkbox" name="apify_use_apify_proxy" {% if public_settings.apify_use_apify_proxy %}checked{% endif %}>
+        <span>Use Apify Proxy</span>
+      </label>
+
+      <label class="check">
+        <input type="checkbox" name="apify_use_chrome" {% if public_settings.apify_use_chrome %}checked{% endif %}>
+        <span>Use Chrome</span>
+      </label>
+    </div>
   </div>
 
   <div class="settings-section">

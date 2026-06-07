@@ -1,1 +1,1 @@
-"""Reddit crawler powered by Crawlbase."""
+"""Multi-provider Reddit crawler."""

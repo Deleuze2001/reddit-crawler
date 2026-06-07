@@ -90,6 +90,11 @@ def old_subreddit_listing_url(subreddit: str, sort: str) -> str:
     return f"https://old.reddit.com/r/{quote(clean_subreddit(subreddit))}/{path_sort}"
 
 
+def old_post_thread_url(post: str) -> str:
+    post_id = extract_post_id(post)
+    return f"https://old.reddit.com/comments/{quote(post_id)}/"
+
+
 def post_thread_url(post: str, comment_limit: int) -> str:
     post_id = extract_post_id(post)
     query = urlencode({"limit": comment_limit, "raw_json": 1, "sort": "top"})

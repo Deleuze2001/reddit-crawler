@@ -17,7 +17,7 @@ from .settings_store import CrawlerSettings
 BASE_DIR = Path(__file__).resolve().parent
 settings = get_settings()
 
-app = FastAPI(title="Reddit Crawlbase Collector")
+app = FastAPI(title="Reddit Scraper Collector")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -45,6 +45,7 @@ def create_job(
     request: Request,
     target_type: str = Form(...),
     target: str = Form(...),
+    provider: str = Form(""),
     sort: str = Form("hot"),
     post_limit: int = Form(25),
     comment_limit: int = Form(100),
@@ -55,6 +56,7 @@ def create_job(
     form = {
         "target_type": target_type,
         "target": target,
+        "provider": provider,
         "sort": sort,
         "post_limit": post_limit,
         "comment_limit": comment_limit,
@@ -74,15 +76,26 @@ def create_job(
                 comment_limit,
                 subreddit_filter,
                 use_js,
+                provider,
                 crawler_settings,
             )
         except ValueError as exc:
             return _render_index(request, error=str(exc), form=form, status_code=400)
 
+        if not crawler_settings.has_provider_credentials(normalized["provider"]):
+            display_provider = normalized["provider"].capitalize()
+            return _render_index(
+                request,
+                error=f"Add {display_provider} credentials in Settings before starting this job.",
+                form=form,
+                status_code=400,
+            )
+
         job_id = repository.create_job(
             conn,
             target_type=normalized["target_type"],
             target=normalized["target"],
+            provider=normalized["provider"],
             sort=normalized["sort"],
             post_limit=normalized["post_limit"],
             include_comments=include_comments == "on",
@@ -99,11 +112,23 @@ def settings_page(request: Request) -> HTMLResponse:
 @app.post("/settings", response_class=HTMLResponse)
 def update_settings(
     request: Request,
-    app_title: str = Form("Reddit Crawlbase Collector"),
+    app_title: str = Form("Reddit Scraper Collector"),
+    default_scraper_provider: str = Form("crawlbase"),
     crawlbase_normal_token: str = Form(""),
     crawlbase_js_token: str = Form(""),
     clear_normal_token: str | None = Form(None),
     clear_js_token: str | None = Form(None),
+    apify_token: str = Form(""),
+    clear_apify_token: str | None = Form(None),
+    apify_actor_id: str = Form("apify/cheerio-scraper"),
+    apify_run_timeout_seconds: int = Form(300),
+    apify_page_load_timeout_seconds: int = Form(90),
+    apify_page_function_timeout_seconds: int = Form(60),
+    apify_max_request_retries: int = Form(2),
+    apify_max_scroll_height_pixels: int = Form(8000),
+    apify_proxy_country: str = Form("US"),
+    apify_use_apify_proxy: str | None = Form(None),
+    apify_use_chrome: str | None = Form(None),
     crawlbase_country: str = Form("US"),
     crawlbase_device: str = Form("desktop"),
     crawlbase_timeout_seconds: float = Form(95.0),
@@ -115,10 +140,22 @@ def update_settings(
     try:
         updates = _normalize_settings_input(
             app_title=app_title,
+            default_scraper_provider=default_scraper_provider,
             crawlbase_normal_token=crawlbase_normal_token,
             crawlbase_js_token=crawlbase_js_token,
             clear_normal_token=clear_normal_token == "on",
             clear_js_token=clear_js_token == "on",
+            apify_token=apify_token,
+            clear_apify_token=clear_apify_token == "on",
+            apify_actor_id=apify_actor_id,
+            apify_run_timeout_seconds=apify_run_timeout_seconds,
+            apify_page_load_timeout_seconds=apify_page_load_timeout_seconds,
+            apify_page_function_timeout_seconds=apify_page_function_timeout_seconds,
+            apify_max_request_retries=apify_max_request_retries,
+            apify_max_scroll_height_pixels=apify_max_scroll_height_pixels,
+            apify_proxy_country=apify_proxy_country,
+            apify_use_apify_proxy=apify_use_apify_proxy == "on",
+            apify_use_chrome=apify_use_chrome == "on",
             crawlbase_country=crawlbase_country,
             crawlbase_device=crawlbase_device,
             crawlbase_timeout_seconds=crawlbase_timeout_seconds,
@@ -230,6 +267,7 @@ def _render_settings(
             "runtime": crawler_settings,
             "public_settings": settings_store.public_settings(crawler_settings),
             "device_choices": sorted(settings_store.DEVICE_CHOICES),
+            "provider_choices": sorted(settings_store.PROVIDER_CHOICES),
             "error": error,
             "saved": saved,
         },
@@ -245,11 +283,15 @@ def _normalize_job_input(
     comment_limit: int,
     subreddit_filter: str,
     use_js: str | None,
+    provider: str,
     crawler_settings: CrawlerSettings,
 ) -> dict[str, Any]:
     clean_type = target_type.strip().lower()
     clean_target = target.strip()
     clean_sort = sort.strip().lower()
+    clean_provider = (provider or crawler_settings.default_scraper_provider).strip().lower()
+    if clean_provider not in settings_store.PROVIDER_CHOICES:
+        clean_provider = crawler_settings.default_scraper_provider
     limit = reddit.clamp_limit(post_limit, crawler_settings.reddit_default_limit, crawler_settings.reddit_max_limit)
     options: dict[str, Any] = {
         "comment_limit": reddit.clamp_limit(comment_limit, 100, 500),
@@ -277,9 +319,13 @@ def _normalize_job_input(
     else:
         raise ValueError("Choose subreddit, post, user, or search.")
 
+    if clean_provider == "apify" and clean_type not in {"subreddit", "post"}:
+        raise ValueError("Apify currently supports subreddit and post jobs.")
+
     return {
         "target_type": clean_type,
         "target": clean_target,
+        "provider": clean_provider,
         "sort": clean_sort,
         "post_limit": limit,
         "options": options,
@@ -289,10 +335,22 @@ def _normalize_job_input(
 def _normalize_settings_input(
     *,
     app_title: str,
+    default_scraper_provider: str,
     crawlbase_normal_token: str,
     crawlbase_js_token: str,
     clear_normal_token: bool,
     clear_js_token: bool,
+    apify_token: str,
+    clear_apify_token: bool,
+    apify_actor_id: str,
+    apify_run_timeout_seconds: int,
+    apify_page_load_timeout_seconds: int,
+    apify_page_function_timeout_seconds: int,
+    apify_max_request_retries: int,
+    apify_max_scroll_height_pixels: int,
+    apify_proxy_country: str,
+    apify_use_apify_proxy: bool,
+    apify_use_chrome: bool,
     crawlbase_country: str,
     crawlbase_device: str,
     crawlbase_timeout_seconds: float,
@@ -302,9 +360,15 @@ def _normalize_settings_input(
     reddit_max_limit: int,
 ) -> dict[str, Any]:
     title = app_title.strip() or settings_store.DEFAULT_VALUES["app_title"]
+    provider = default_scraper_provider.strip().lower()
+    if provider not in settings_store.PROVIDER_CHOICES:
+        raise ValueError("Choose Crawlbase or Apify as the default provider.")
     country = crawlbase_country.strip().upper()
     if country and (len(country) != 2 or not country.isalpha()):
         raise ValueError("Country must be a two-letter code, or blank.")
+    apify_country = apify_proxy_country.strip().upper()
+    if apify_country and (len(apify_country) != 2 or not apify_country.isalpha()):
+        raise ValueError("Apify proxy country must be a two-letter code, or blank.")
 
     device = crawlbase_device.strip().lower()
     if device not in settings_store.DEVICE_CHOICES:
@@ -320,9 +384,22 @@ def _normalize_settings_input(
         raise ValueError("Maximum post limit must be between 1 and 500.")
     if reddit_default_limit < 1 or reddit_default_limit > reddit_max_limit:
         raise ValueError("Default post limit must be between 1 and the maximum post limit.")
+    if not apify_actor_id.strip():
+        raise ValueError("Apify actor id is required.")
+    if apify_run_timeout_seconds < 30 or apify_run_timeout_seconds > 1800:
+        raise ValueError("Apify run timeout must be between 30 and 1800 seconds.")
+    if apify_page_load_timeout_seconds < 10 or apify_page_load_timeout_seconds > 300:
+        raise ValueError("Apify page load timeout must be between 10 and 300 seconds.")
+    if apify_page_function_timeout_seconds < 5 or apify_page_function_timeout_seconds > 300:
+        raise ValueError("Apify page function timeout must be between 5 and 300 seconds.")
+    if apify_max_request_retries < 0 or apify_max_request_retries > 10:
+        raise ValueError("Apify retries must be between 0 and 10.")
+    if apify_max_scroll_height_pixels < 0 or apify_max_scroll_height_pixels > 100000:
+        raise ValueError("Apify scroll height must be between 0 and 100000 pixels.")
 
     updates: dict[str, Any] = {
         "app_title": title,
+        "default_scraper_provider": provider,
         "crawlbase_country": country,
         "crawlbase_device": device,
         "crawlbase_timeout_seconds": crawlbase_timeout_seconds,
@@ -330,10 +407,20 @@ def _normalize_settings_input(
         "collector_poll_seconds": collector_poll_seconds,
         "reddit_default_limit": reddit_default_limit,
         "reddit_max_limit": reddit_max_limit,
+        "apify_actor_id": apify_actor_id.strip(),
+        "apify_run_timeout_seconds": apify_run_timeout_seconds,
+        "apify_page_load_timeout_seconds": apify_page_load_timeout_seconds,
+        "apify_page_function_timeout_seconds": apify_page_function_timeout_seconds,
+        "apify_max_request_retries": apify_max_request_retries,
+        "apify_max_scroll_height_pixels": apify_max_scroll_height_pixels,
+        "apify_proxy_country": apify_country,
+        "apify_use_apify_proxy": str(apify_use_apify_proxy).lower(),
+        "apify_use_chrome": str(apify_use_chrome).lower(),
     }
 
     normal_token = crawlbase_normal_token.strip()
     js_token = crawlbase_js_token.strip()
+    clean_apify_token = apify_token.strip()
     if clear_normal_token:
         updates["crawlbase_normal_token"] = ""
     elif normal_token:
@@ -343,6 +430,11 @@ def _normalize_settings_input(
         updates["crawlbase_js_token"] = ""
     elif js_token:
         updates["crawlbase_js_token"] = js_token
+
+    if clear_apify_token:
+        updates["apify_token"] = ""
+    elif clean_apify_token:
+        updates["apify_token"] = clean_apify_token
 
     return updates
 
