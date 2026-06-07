@@ -20,6 +20,7 @@ class CrawlbaseError(RuntimeError):
 @dataclass
 class CrawlbaseResult:
     target_url: str
+    http_status: int
     body: Any
     raw_body: str
     pc_status: int | None
@@ -33,6 +34,8 @@ class CrawlbaseResult:
 
     @property
     def success(self) -> bool:
+        if self.http_status >= 400:
+            return False
         if self.pc_status != 200:
             return False
         if self.original_status is not None and self.original_status >= 400:
@@ -46,6 +49,7 @@ class CrawlbaseResult:
     def metadata(self) -> dict[str, Any]:
         return {
             "target_url": self.target_url,
+            "http_status": self.http_status,
             "final_url": self.final_url,
             "pc_status": self.pc_status,
             "original_status": self.original_status,
@@ -107,7 +111,8 @@ class CrawlbaseClient:
             return result
         raise CrawlbaseError(
             "Crawlbase request failed "
-            f"(pc_status={result.pc_status}, original_status={result.original_status}, url={result.target_url})"
+            f"(http_status={result.http_status}, pc_status={result.pc_status}, "
+            f"original_status={result.original_status}, url={result.target_url})"
         )
 
     def _fetch_once(
@@ -144,7 +149,6 @@ class CrawlbaseClient:
             headers={"Accept-Encoding": "gzip"},
         ) as client:
             response = client.get(CRAWLBASE_ENDPOINT, params=params)
-            response.raise_for_status()
 
         headers = {key.lower(): value for key, value in response.headers.items()}
         envelope = _json_or_none(response.text)
@@ -152,7 +156,11 @@ class CrawlbaseClient:
             body_value = envelope.get("body")
             raw_body = body_value if isinstance(body_value, str) else json.dumps(body_value or "")
             body = _decode_body(body_value)
-            pc_status = _int_or_none(envelope.get("pc_status") or headers.get("pc_status"))
+            pc_status = _int_or_none(
+                envelope.get("pc_status")
+                or headers.get("pc_status")
+                or _status_fallback(response.status_code)
+            )
             original_status = _int_or_none(envelope.get("original_status") or headers.get("original_status"))
             final_url = envelope.get("url") or headers.get("url")
             rid = envelope.get("rid") or headers.get("rid")
@@ -160,7 +168,7 @@ class CrawlbaseClient:
         else:
             raw_body = response.text
             body = _decode_body(response.text)
-            pc_status = _int_or_none(headers.get("pc_status"))
+            pc_status = _int_or_none(headers.get("pc_status") or _status_fallback(response.status_code))
             original_status = _int_or_none(headers.get("original_status"))
             final_url = headers.get("url")
             rid = headers.get("rid")
@@ -168,6 +176,7 @@ class CrawlbaseClient:
 
         return CrawlbaseResult(
             target_url=target_url,
+            http_status=response.status_code,
             body=body,
             raw_body=raw_body,
             pc_status=pc_status,
@@ -225,3 +234,7 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _status_fallback(status_code: int) -> int | None:
+    return status_code if status_code >= 400 else None

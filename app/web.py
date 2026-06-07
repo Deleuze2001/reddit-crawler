@@ -145,6 +145,7 @@ def job_detail(request: Request, job_id: str) -> HTMLResponse:
         posts = repository.list_job_posts(conn, job_id)
 
     return templates.TemplateResponse(
+        request,
         "job.html",
         {
             "request": request,
@@ -167,6 +168,7 @@ def post_detail(request: Request, post_id: str) -> HTMLResponse:
         comments = repository.list_post_comments(conn, post_id)
 
     return templates.TemplateResponse(
+        request,
         "post.html",
         {
             "request": request,
@@ -192,6 +194,7 @@ def _render_index(
         posts = repository.list_recent_posts(conn)
 
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
             "request": request,
@@ -219,6 +222,7 @@ def _render_settings(
         crawler_settings = settings_store.get_crawler_settings(conn)
 
     return templates.TemplateResponse(
+        request,
         "settings.html",
         {
             "request": request,
