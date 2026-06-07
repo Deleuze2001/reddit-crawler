@@ -72,24 +72,35 @@ def process_job(
     target_type = job["target_type"]
     if target_type == "subreddit":
         subreddit_name = reddit.clean_subreddit(job["target"])
-        body, last_response = _fetch_reddit_json(
-            client,
-            reddit.subreddit_about_url(subreddit_name),
-            options,
-            stats,
-        )
-        subreddit_about = reddit.parse_subreddit_about(body)
-        if subreddit_about:
-            repository.save_subreddit(conn, subreddit_about)
-            stats["subreddits"] += 1
+        try:
+            html_text, last_response = _fetch_reddit_html(
+                client,
+                reddit.old_subreddit_listing_url(subreddit_name, job.get("sort") or "hot"),
+                options,
+                stats,
+            )
+            posts = reddit.parse_old_reddit_listing(html_text, limit)
+            last_response["source"] = "old_reddit_html"
+        except CrawlbaseError as exc:
+            last_response = {"error": str(exc), "fallback": "reddit_json"}
+            body, last_response = _fetch_reddit_json(
+                client,
+                reddit.subreddit_about_url(subreddit_name),
+                options,
+                stats,
+            )
+            subreddit_about = reddit.parse_subreddit_about(body)
+            if subreddit_about:
+                repository.save_subreddit(conn, subreddit_about)
+                stats["subreddits"] += 1
 
-        body, last_response = _fetch_reddit_json(
-            client,
-            reddit.subreddit_listing_url(subreddit_name, job.get("sort") or "hot", limit),
-            options,
-            stats,
-        )
-        posts = reddit.parse_listing_posts(body)
+            body, last_response = _fetch_reddit_json(
+                client,
+                reddit.subreddit_listing_url(subreddit_name, job.get("sort") or "hot", limit),
+                options,
+                stats,
+            )
+            posts = reddit.parse_listing_posts(body)
         _save_posts(conn, posts, str(job["id"]), stats)
         if include_comments:
             last_response = _collect_comments_for_posts(conn, posts, str(job["id"]), client, options, stats, comment_limit)
@@ -163,6 +174,30 @@ def _fetch_reddit_json(
     stats["requests"] += 1
     if not isinstance(result.body, (dict, list)):
         raise CrawlbaseError(f"Expected a JSON response from Reddit, got {type(result.body).__name__}.")
+    return result.body, result.metadata()
+
+
+def _fetch_reddit_html(
+    client: CrawlbaseClient,
+    url: str,
+    options: dict[str, Any],
+    stats: dict[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    result = client.fetch(
+        url,
+        use_js=bool(options.get("use_js")),
+        autoparse=False,
+        render_options={
+            "ajax_wait": True,
+            "page_wait": options.get("page_wait") or 0,
+            "scroll": bool(options.get("scroll")),
+            "scroll_interval": options.get("scroll_interval") or 10,
+        },
+    )
+    client.ensure_success(result)
+    stats["requests"] += 1
+    if not isinstance(result.body, str):
+        raise CrawlbaseError(f"Expected an HTML response from Reddit, got {type(result.body).__name__}.")
     return result.body, result.metadata()
 
 

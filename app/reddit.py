@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import re
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 
@@ -83,6 +84,12 @@ def subreddit_listing_url(subreddit: str, sort: str, limit: int) -> str:
     return f"https://www.reddit.com/r/{quote(clean_subreddit(subreddit))}/{clean_sort}.json?{query}"
 
 
+def old_subreddit_listing_url(subreddit: str, sort: str) -> str:
+    clean_sort = sort if sort in SUBREDDIT_SORTS else "hot"
+    path_sort = "" if clean_sort == "hot" else f"{clean_sort}/"
+    return f"https://old.reddit.com/r/{quote(clean_subreddit(subreddit))}/{path_sort}"
+
+
 def post_thread_url(post: str, comment_limit: int) -> str:
     post_id = extract_post_id(post)
     query = urlencode({"limit": comment_limit, "raw_json": 1, "sort": "top"})
@@ -157,6 +164,12 @@ def parse_listing_posts(payload: Any) -> list[dict[str, Any]]:
             if post:
                 posts.append(post)
     return posts
+
+
+def parse_old_reddit_listing(html_text: str, limit: int) -> list[dict[str, Any]]:
+    parser = _OldRedditListingParser()
+    parser.feed(html_text)
+    return parser.posts[:limit]
 
 
 def parse_post_thread(payload: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -330,3 +343,102 @@ def _float_or_none(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+class _OldRedditListingParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.posts: list[dict[str, Any]] = []
+        self._current: dict[str, Any] | None = None
+        self._depth = 0
+        self._capture_title = False
+        self._title_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attr = {key: value or "" for key, value in attrs}
+
+        if self._current is None and tag == "div" and _is_old_reddit_post(attr):
+            self._current = _old_reddit_post_from_attrs(attr)
+            self._depth = 1
+            self._title_parts = []
+            return
+
+        if self._current is None:
+            return
+
+        if tag == "div":
+            self._depth += 1
+        elif tag == "a" and "title" in attr.get("class", "").split():
+            self._capture_title = True
+            if attr.get("href") and not self._current.get("url"):
+                self._current["url"] = absolute_reddit_url(attr["href"])
+        elif tag == "span" and "linkflairlabel" in attr.get("class", "").split():
+            self._current["flair_text"] = attr.get("title") or None
+
+    def handle_data(self, data: str) -> None:
+        if self._capture_title:
+            self._title_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._current is None:
+            return
+
+        if tag == "a" and self._capture_title:
+            self._capture_title = False
+            title = " ".join(part.strip() for part in self._title_parts if part.strip())
+            if title:
+                self._current["title"] = title
+
+        if tag == "div":
+            self._depth -= 1
+            if self._depth <= 0:
+                if self._current.get("id") and self._current.get("title"):
+                    self.posts.append(self._current)
+                self._current = None
+                self._title_parts = []
+                self._capture_title = False
+
+
+def _is_old_reddit_post(attrs: dict[str, str]) -> bool:
+    fullname = attrs.get("data-fullname", "")
+    class_names = attrs.get("class", "")
+    return fullname.startswith("t3_") and attrs.get("data-type") == "link" and "thing" in class_names
+
+
+def _old_reddit_post_from_attrs(attrs: dict[str, str]) -> dict[str, Any]:
+    fullname = attrs.get("data-fullname") or ""
+    permalink = absolute_reddit_url(attrs.get("data-permalink"))
+    url = absolute_reddit_url(attrs.get("data-url")) or permalink
+    timestamp = _int_or_none(attrs.get("data-timestamp"))
+
+    return {
+        "id": fullname.removeprefix("t3_"),
+        "fullname": fullname,
+        "subreddit": attrs.get("data-subreddit") or None,
+        "title": None,
+        "author": attrs.get("data-author") or None,
+        "selftext": "",
+        "url": url,
+        "permalink": permalink,
+        "thumbnail": None,
+        "media_url": None,
+        "created_at": parse_created_utc(timestamp / 1000 if timestamp else None),
+        "score": _int_or_none(attrs.get("data-score")),
+        "upvote_ratio": None,
+        "num_comments": _int_or_none(attrs.get("data-comments-count")),
+        "is_self": (attrs.get("data-domain") or "").startswith("self."),
+        "over18": _bool_string(attrs.get("data-nsfw")),
+        "flair_text": None,
+        "raw": {"source": "old_reddit_html", "attrs": attrs},
+    }
+
+
+def _bool_string(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    lowered = value.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    return None

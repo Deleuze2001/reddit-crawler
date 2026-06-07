@@ -64,6 +64,39 @@ class RedditParserTests(unittest.TestCase):
         self.assertEqual(user["username"], "example_user")
         self.assertEqual(user["total_karma"], 12)
 
+    def test_parse_old_reddit_listing(self) -> None:
+        posts = reddit.parse_old_reddit_listing(
+            """
+            <div class="thing id-t3_abc123 odd link self"
+                 id="thing_t3_abc123"
+                 data-fullname="t3_abc123"
+                 data-type="link"
+                 data-author="poster"
+                 data-subreddit="python"
+                 data-timestamp="1701995342000"
+                 data-url="/r/python/comments/abc123/example/"
+                 data-permalink="/r/python/comments/abc123/example/"
+                 data-domain="self.python"
+                 data-comments-count="12"
+                 data-score="42"
+                 data-nsfw="false">
+              <div class="entry">
+                <p class="title">
+                  <a class="title may-blank" href="/r/python/comments/abc123/example/">Example title</a>
+                </p>
+              </div>
+            </div>
+            """,
+            10,
+        )
+
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]["id"], "abc123")
+        self.assertEqual(posts[0]["title"], "Example title")
+        self.assertEqual(posts[0]["score"], 42)
+        self.assertEqual(posts[0]["num_comments"], 12)
+        self.assertFalse(posts[0]["over18"])
+
 
 def _listing_payload() -> dict:
     return {
