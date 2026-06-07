@@ -23,28 +23,20 @@ Each job can optionally collect comments for the posts it finds. Keep that setti
 
 ```sh
 cp .env.example .env
-# Fill in CRAWLBASE_NORMAL_TOKEN and optionally CRAWLBASE_JS_TOKEN.
+# Set POSTGRES_PASSWORD in .env before starting the containers.
 docker compose up --build
 ```
 
-Open `http://localhost:8000`.
+Open `http://localhost:8000`, then submit Crawlbase credentials and crawler tuning from `Settings`.
 
-The collector will leave jobs queued until at least one Crawlbase token is available. After editing `.env`, restart the collector:
-
-```sh
-docker compose up -d collector
-```
+The collector will leave jobs queued until at least one Crawlbase token is saved from the UI. Settings are stored in PostgreSQL and are read by both the web and collector containers.
 
 ## Configuration
 
-- `CRAWLBASE_NORMAL_TOKEN`: normal Crawlbase token for JSON/static responses.
-- `CRAWLBASE_JS_TOKEN`: JavaScript token for rendered fallback or explicit JS jobs.
-- `CRAWLBASE_COUNTRY`: optional two-letter proxy country, default `US`.
-- `CRAWLBASE_DEVICE`: `desktop`, `tablet`, or `mobile`, default `desktop`.
-- `CRAWLBASE_TIMEOUT_SECONDS`: default `95`, matching Crawlbase's recommendation for slower rendered crawls.
-- `CRAWLBASE_RATE_LIMIT_SECONDS`: delay between Crawlbase calls per collector, default `2.0`.
-- `REDDIT_DEFAULT_LIMIT`: default number of posts, default `25`.
-- `REDDIT_MAX_LIMIT`: maximum posts accepted by the UI, default `100`.
+- `.env`: PostgreSQL bootstrap values for the shared database container. `POSTGRES_PASSWORD` is required before the UI can start.
+- UI settings: Crawlbase normal token, JavaScript token, proxy country, device, request timeout, collector poll delay, request delay, and post limits.
+
+Crawlbase secrets are not echoed back into forms. The settings page only indicates whether each token is present.
 
 ## Notes
 
